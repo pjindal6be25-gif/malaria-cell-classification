@@ -1,0 +1,19 @@
+# Virtual environment and Python cache
+.venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Dataset (27,558 PNGs + nested copy - too large for Git)
+cell_images/
+
+# Quick smoke-test outputs
+outputs/quick/
+
+# Local assignment brief & AI assistant config
+CLAUDE.md
+TASK.md
+
+# OS generated files
+Thumbs.db
+.DS_Store
