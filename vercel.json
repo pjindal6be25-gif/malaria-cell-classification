@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "framework": null,
+  "installCommand": "echo 'Skipping Python GPU training requirements on Vercel'",
+  "buildCommand": "echo 'Static web build ready'",
+  "outputDirectory": "web"
+}

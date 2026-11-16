@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Malaria Cell Image Classification — PyTorch CNN &amp; MobileNetV2</title>
+  <meta name="description" content="Deep-learning medical screening aid classifying segmented red blood cell images as Parasitized (malaria) or Uninfected using a custom PyTorch CNN and MobileNetV2." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Top Navigation -->
+  <header class="navbar">
+    <div class="container nav-inner">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span class="brand-title">MalariaCNN</span>
+        <span class="brand-badge">PyTorch 2.11 + CUDA 12.8</span>
+      </div>
+      <nav class="nav-links">
+        <a href="#classifier">Live Classifier</a>
+        <a href="#threshold-tuner">Threshold Tuner</a>
+        <a href="#results">Benchmark Results</a>
+        <a href="#plots">Plots &amp; Curves</a>
+        <a href="#architecture">Architecture &amp; Report</a>
+        <a href="https://github.com/pjindal6be25-gif/malaria-cell-classification" target="_blank" rel="noopener" class="btn-github">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub Repo
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-pills">
+        <span class="pill pill-accent">NIH Malaria Dataset • 27,558 Cell Images</span>
+        <span class="pill">NVIDIA GeForce RTX 5050 Laptop GPU</span>
+        <span class="pill">Zero Split Leakage (MD5 Verified)</span>
+      </div>
+      <h1>Malaria Red Blood Cell Classification</h1>
+      <p class="hero-subtitle">
+        Automated blood-smear screening aid that classifies segmented erythrocytes as <strong>Parasitized</strong> or <strong>Uninfected</strong>.
+        Features a fast <strong>0.25M-parameter Custom CNN</strong> trained from scratch alongside a fine-tuned <strong>MobileNetV2</strong> transfer-learning baseline, with validation-tuned decision thresholds and Grad-CAM explainability.
+      </p>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Custom CNN Test Accuracy (0.50)</div>
+          <div class="kpi-value">96.57%</div>
+          <div class="kpi-sub">ROC-AUC: <strong>0.9927</strong> on 4,134 test cells</div>
+        </div>
+        <div class="kpi-card kpi-highlight">
+          <div class="kpi-label">Recall at Tuned Threshold (0.176)</div>
+          <div class="kpi-value">97.44%</div>
+          <div class="kpi-sub">Cuts missed infections from 88 &rarr; <strong>53</strong></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Model Footprint &amp; Speed</div>
+          <div class="kpi-value">0.25M <span class="kpi-unit">params</span></div>
+          <div class="kpi-sub"><strong>8.9&times; smaller</strong> &amp; <strong>3.3&times; faster</strong> than MobileNetV2</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">End-to-End Inference</div>
+          <div class="kpi-value">1.44 <span class="kpi-unit">ms/img</span></div>
+          <div class="kpi-sub">0.74 ms batch-1 GPU forward pass</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="container">
+    <!-- SECTION 1: LIVE CLASSIFIER + GRAD-CAM -->
+    <section id="classifier" class="section-block">
+      <div class="section-header">
+        <div>
+          <span class="section-eyebrow">Interactive Inference Engine • Real Trained Weights (cnn_best.pt)</span>
+          <h2>1. Live Malaria Cell Classifier &amp; Grad-CAM</h2>
+          <p class="section-desc">
+            Runs your exact trained 4-block <code>MalariaCNN</code> (249,153 fused parameters) directly in the browser. Upload any blood smear cell image or click a sample from the held-out test set to inspect its prediction and live Grad-CAM heatmap.
+          </p>
+        </div>
+        <div class="engine-status" id="engineStatus">
+          <span class="status-dot loading"></span>
+          <span id="engineStatusText">Loading cnn_weights.bin (973 KB)...</span>
+        </div>
+      </div>
+
+      <div class="classifier-layout">
+        <!-- Left column: Upload + Sample gallery -->
+        <div class="panel">
+          <div class="panel-title">Select a Held-Out Test Cell or Upload Your Own</div>
+
+          <div class="upload-dropzone" id="dropzone">
+            <input type="file" id="fileInput" accept="image/png,image/jpeg,image/bmp,image/webp" hidden />
+            <div class="dropzone-content">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <div>
+                <strong>Click to upload a cell image</strong> or drag &amp; drop here
+                <div class="dropzone-sub">PNG, JPG, BMP • Automatically resized to 128&times;128 RGB</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="samples-header">
+            <span>Or pick a real cell from the held-out test set (<code>outputs/splits/test.csv</code>):</span>
+          </div>
+          <div class="samples-grid" id="samplesGrid">
+            <!-- Populated by app.js -->
+          </div>
+        </div>
+
+        <!-- Right column: Live Prediction + Grad-CAM Visualiser -->
+        <div class="panel prediction-panel">
+          <div class="pred-top-bar">
+            <div class="verdict-box" id="verdictBox">
+              <div class="verdict-eyebrow">MODEL PREDICTION</div>
+              <div class="verdict-label" id="predLabel">—</div>
+              <div class="verdict-sub" id="predSub">Select or upload an image</div>
+            </div>
+            <div class="pred-metrics-mini">
+              <div class="mini-stat">
+                <span class="mini-label">P(Parasitized)</span>
+                <span class="mini-val mono" id="predProb">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="mini-label">Confidence</span>
+                <span class="mini-val mono" id="predConf">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="mini-label">Inference Time</span>
+                <span class="mini-val mono" id="predTime">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Probability Gauge with Threshold Markers -->
+          <div class="gauge-container">
+            <div class="gauge-labels">
+              <span>0.00 (Uninfected)</span>
+              <span class="mono" id="activeThrLabel">Active Threshold: 0.176 (Recall-Tuned)</span>
+              <span>1.00 (Parasitized)</span>
+            </div>
+            <div class="gauge-track">
+              <div class="gauge-fill" id="gaugeFill" style="width: 0%"></div>
+              <div class="gauge-marker" id="gaugeMarker" style="left: 17.6%" title="Decision Threshold"></div>
+            </div>
+            <div class="thr-controls">
+              <label for="liveThrSlider">Decision Threshold:</label>
+              <input type="range" id="liveThrSlider" min="0.05" max="0.95" step="0.001" value="0.176" />
+              <button class="btn-chip active" id="btnThrTuned" type="button">0.176 (Tuned)</button>
+              <button class="btn-chip" id="btnThrDefault" type="button">0.500 (Default)</button>
+            </div>
+          </div>
+
+          <!-- Dual Canvases: Input 128x128 vs Grad-CAM Heatmap Overlay -->
+          <div class="canvas-comparison">
+            <div class="canvas-card">
+              <div class="canvas-header">
+                <span>Preprocessed Input (128&times;128)</span>
+                <span class="mono" id="imgOrigSize">RGB [0, 1]</span>
+              </div>
+              <div class="canvas-wrap">
+                <canvas id="inputCanvas" width="128" height="128"></canvas>
+              </div>
+            </div>
+
+            <div class="canvas-card">
+              <div class="canvas-header">
+                <span>Live Grad-CAM Overlay (Block 4 ReLU)</span>
+                <div class="opacity-ctrl">
+                  <label for="camOpacity">Heatmap:</label>
+                  <input type="range" id="camOpacity" min="0" max="100" value="58" />
+                </div>
+              </div>
+              <div class="canvas-wrap">
+                <canvas id="gradcamCanvas" width="128" height="128"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="sample-meta-banner" id="sampleInfoBanner">
+            <!-- Populated with ground-truth & MobileNet comparison when a test sample is selected -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: INTERACTIVE THRESHOLD TUNER ON ALL 4,134 TEST IMAGES -->
+    <section id="threshold-tuner" class="section-block">
+      <div class="section-header">
+        <div>
+          <span class="section-eyebrow">Clinical Trade-off Explorer • All 4,134 Held-Out Test Images</span>
+          <h2>2. Interactive Decision Threshold Explorer</h2>
+          <p class="section-desc">
+            In malaria screening, a <strong>missed infection (False Negative)</strong> is far more dangerous than a false alarm (which simply triggers a human microscopist re-check). Drag the threshold slider below to recompute the exact confusion matrix and clinical metrics across all <strong>4,134 test images</strong> in real time.
+          </p>
+        </div>
+      </div>
+
+      <div class="tuner-layout">
+        <div class="panel tuner-controls-panel">
+          <div class="tuner-row">
+            <span class="tuner-label">Select Model:</span>
+            <div class="seg-group">
+              <button type="button" class="seg-btn active" id="tunerModelCnn">Custom CNN (Headline)</button>
+              <button type="button" class="seg-btn" id="tunerModelMob">MobileNetV2 (Transfer)</button>
+            </div>
+          </div>
+
+          <div class="tuner-slider-box">
+            <div class="tuner-slider-head">
+              <span>Classification Threshold P(Parasitized) &ge;</span>
+              <span class="tuner-thr-Readout mono" id="tunerThrVal">0.176</span>
+            </div>
+            <input type="range" id="tunerSlider" min="0.01" max="0.99" step="0.001" value="0.176" class="full-slider" />
+            <div class="tuner-presets">
+              <button type="button" class="btn-chip active" id="presetCnnTuned">CNN Tuned (0.176)</button>
+              <button type="button" class="btn-chip" id="presetMobTuned">MobileNet Tuned (0.281)</button>
+              <button type="button" class="btn-chip" id="presetDefault">Default (0.500)</button>
+            </div>
+          </div>
+
+          <div class="tuner-metrics-grid">
+            <div class="t-metric highlight-recall">
+              <div class="tm-name">Recall (Sensitivity)</div>
+              <div class="tm-val mono" id="tmRecall">97.44%</div>
+              <div class="tm-note">Target: &ge;98% on val</div>
+            </div>
+            <div class="t-metric">
+              <div class="tm-name">Precision</div>
+              <div class="tm-val mono" id="tmPrecision">93.89%</div>
+              <div class="tm-note">Positive predictive value</div>
+            </div>
+            <div class="t-metric">
+              <div class="tm-name">Specificity</div>
+              <div class="tm-val mono" id="tmSpecificity">93.66%</div>
+              <div class="tm-note">True negative rate</div>
+            </div>
+            <div class="t-metric">
+              <div class="tm-name">Accuracy</div>
+              <div class="tm-val mono" id="tmAccuracy">95.55%</div>
+              <div class="tm-note">Overall correct</div>
+            </div>
+            <div class="t-metric">
+              <div class="tm-name">F1 Score</div>
+              <div class="tm-val mono" id="tmF1">0.9563</div>
+              <div class="tm-note">Harmonic mean</div>
+            </div>
+            <div class="t-metric">
+              <div class="tm-name">ROC-AUC</div>
+              <div class="tm-val mono" id="tmAuc">0.9927</div>
+              <div class="tm-note">Threshold-independent</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel cm-live-panel">
+          <div class="panel-title">Live Confusion Matrix (4,134 Test Images)</div>
+          <div class="cm-grid">
+            <div class="cm-corner">True \ Predicted</div>
+            <div class="cm-col-hdr">Pred: Uninfected (0)</div>
+            <div class="cm-col-hdr">Pred: Parasitized (1)</div>
+
+            <div class="cm-row-hdr">True: Uninfected (0)<br><small>2,067 cells</small></div>
+            <div class="cm-cell cm-tn">
+              <div class="cm-num mono" id="cmTN">1,936</div>
+              <div class="cm-tag">True Negative (TN)</div>
+            </div>
+            <div class="cm-cell cm-fp">
+              <div class="cm-num mono" id="cmFP">131</div>
+              <div class="cm-tag">False Alarm (FP)</div>
+            </div>
+
+            <div class="cm-row-hdr">True: Parasitized (1)<br><small>2,067 cells</small></div>
+            <div class="cm-cell cm-fn">
+              <div class="cm-num mono" id="cmFN">53</div>
+              <div class="cm-tag">Missed Infection (FN)</div>
+            </div>
+            <div class="cm-cell cm-tp">
+              <div class="cm-num mono" id="cmTP">2,014</div>
+              <div class="cm-tag">Detected Infection (TP)</div>
+            </div>
+          </div>
+          <div class="cm-callout" id="cmCallout">
+            At threshold <strong>0.176</strong>, missed malaria infections drop from <strong>88</strong> (at 0.50) down to <strong>53</strong> (35 fewer missed cases).
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: BENCHMARK TABLES & BOOTSTRAP -->
+    <section id="results" class="section-block">
+      <div class="section-header">
+        <div>
+          <span class="section-eyebrow">Official Test-Set Evaluation • Single Source of Truth (outputs/results.csv)</span>
+          <h2>3. Model Benchmark &amp; Statistical Comparison</h2>
+          <p class="section-desc">
+            Evaluated once on the held-out test split (4,134 images). Decision thresholds were tuned exclusively on the validation split (4,134 images) to prevent test-set leakage.
+          </p>
+        </div>
+      </div>
+
+      <div class="panel table-panel">
+        <div class="panel-title">Classification Performance on Held-Out Test Set</div>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Threshold</th>
+                <th>Accuracy</th>
+                <th>Precision</th>
+                <th>Recall (Sensitivity)</th>
+                <th>Specificity</th>
+                <th>F1 Score</th>
+                <th>ROC-AUC</th>
+                <th>Missed (FN)</th>
+                <th>False Alarms (FP)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="row-highlight">
+                <td><strong>Custom CNN (Headline)</strong></td>
+                <td><span class="badge-thr">0.500 (default)</span></td>
+                <td class="mono">96.57%</td>
+                <td class="mono">97.34%</td>
+                <td class="mono">95.74%</td>
+                <td class="mono">97.39%</td>
+                <td class="mono">0.9654</td>
+                <td class="mono">0.9927</td>
+                <td class="mono">88</td>
+                <td class="mono">54</td>
+              </tr>
+              <tr class="row-highlight-tuned">
+                <td><strong>Custom CNN (Headline)</strong></td>
+                <td><span class="badge-thr tuned">0.176 (tuned)</span></td>
+                <td class="mono">95.55%</td>
+                <td class="mono">93.89%</td>
+                <td class="mono"><strong>97.44%</strong></td>
+                <td class="mono">93.66%</td>
+                <td class="mono">0.9563</td>
+                <td class="mono">0.9927</td>
+                <td class="mono"><strong class="text-good">53</strong></td>
+                <td class="mono">131</td>
+              </tr>
+              <tr>
+                <td>MobileNetV2 (transfer)</td>
+                <td><span class="badge-thr">0.500 (default)</span></td>
+                <td class="mono">96.15%</td>
+                <td class="mono">97.70%</td>
+                <td class="mono">94.53%</td>
+                <td class="mono">97.77%</td>
+                <td class="mono">0.9609</td>
+                <td class="mono">0.9937</td>
+                <td class="mono">113</td>
+                <td class="mono">46</td>
+              </tr>
+              <tr>
+                <td>MobileNetV2 (transfer)</td>
+                <td><span class="badge-thr tuned">0.281 (tuned)</span></td>
+                <td class="mono">96.52%</td>
+                <td class="mono">95.89%</td>
+                <td class="mono"><strong>97.19%</strong></td>
+                <td class="mono">95.84%</td>
+                <td class="mono">0.9654</td>
+                <td class="mono">0.9937</td>
+                <td class="mono">58</td>
+                <td class="mono">86</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="dual-tables">
+        <div class="panel table-panel">
+          <div class="panel-title">Efficiency, Speed &amp; Training Summary (RTX 5050 Laptop GPU)</div>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th>Parameters</th>
+                  <th>Train Time</th>
+                  <th>Epochs Run</th>
+                  <th>Batch-1 (GPU)</th>
+                  <th>Batch-64 (GPU)</th>
+                  <th>End-to-End*</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Custom CNN</strong></td>
+                  <td class="mono"><strong>0.25 M</strong></td>
+                  <td class="mono">7.1 min</td>
+                  <td>Early stop ep 46/50 (best 44)</td>
+                  <td class="mono"><strong>0.74 ms</strong></td>
+                  <td class="mono"><strong>0.072 ms</strong></td>
+                  <td class="mono"><strong>1.44 ms</strong></td>
+                </tr>
+                <tr>
+                  <td>MobileNetV2</td>
+                  <td class="mono">2.23 M</td>
+                  <td class="mono">3.8 min</td>
+                  <td>Frozen 5/5; FT ep 18/20 (best 13)</td>
+                  <td class="mono">5.00 ms</td>
+                  <td class="mono">0.111 ms</td>
+                  <td class="mono">4.72 ms</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="table-footnote">*End-to-end latency includes reading the PNG from disk, resizing to 128&times;128, and running single-image inference (<code>predict.py</code> path).</p>
+        </div>
+
+        <div class="panel table-panel">
+          <div class="panel-title">Paired Bootstrap Test (1,000 Resamples: MobileNetV2 minus Custom CNN)</div>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Threshold</th>
+                  <th>Difference</th>
+                  <th>95% Confidence Interval</th>
+                  <th>Statistical Verdict</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>ROC-AUC</td>
+                  <td class="mono">—</td>
+                  <td class="mono">+0.0010</td>
+                  <td class="mono">-0.0003 to +0.0025</td>
+                  <td><span class="verdict-pill noise">Within Noise</span></td>
+                </tr>
+                <tr>
+                  <td>Accuracy</td>
+                  <td class="mono">0.50</td>
+                  <td class="mono">-0.4112 pts</td>
+                  <td class="mono">-0.8466 to +0.0490 pts</td>
+                  <td><span class="verdict-pill noise">Within Noise</span></td>
+                </tr>
+                <tr>
+                  <td>F1 Score</td>
+                  <td class="mono">0.50</td>
+                  <td class="mono">-0.0045</td>
+                  <td class="mono">-0.0089 to +0.0003</td>
+                  <td><span class="verdict-pill noise">Within Noise</span></td>
+                </tr>
+                <tr>
+                  <td>Accuracy</td>
+                  <td class="mono">Tuned</td>
+                  <td class="mono">+0.9676 pts</td>
+                  <td class="mono">+0.4112 to +1.5481 pts</td>
+                  <td><span class="verdict-pill mob">MobileNetV2 Better</span></td>
+                </tr>
+                <tr>
+                  <td>F1 Score</td>
+                  <td class="mono">Tuned</td>
+                  <td class="mono">+0.0091</td>
+                  <td class="mono">+0.0037 to +0.0148</td>
+                  <td><span class="verdict-pill mob">MobileNetV2 Better</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 4: DIAGNOSTIC PLOTS GALLERY -->
+    <section id="plots" class="section-block">
+      <div class="section-header">
+        <div>
+          <span class="section-eyebrow">Generated by train.py • Saved in outputs/</span>
+          <h2>4. Training Curves, ROC &amp; Confusion Matrices</h2>
+        </div>
+      </div>
+
+      <div class="plots-grid-top">
+        <div class="panel plot-card">
+          <div class="panel-title">Custom CNN: Loss &amp; Accuracy Curves (46 Epochs)</div>
+          <img src="assets/plots/curves_cnn.png" alt="Custom CNN Training Curves" loading="lazy" />
+        </div>
+        <div class="panel plot-card">
+          <div class="panel-title">MobileNetV2: Frozen (Ep 1–5) &amp; Fine-Tuning (Ep 6–23)</div>
+          <img src="assets/plots/curves_mobilenet.png" alt="MobileNetV2 Training Curves" loading="lazy" />
+        </div>
+      </div>
+
+      <div class="plots-grid-bottom">
+        <div class="panel plot-card">
+          <div class="panel-title">Test-Set ROC Curves</div>
+          <img src="assets/plots/roc_curves.png" alt="ROC Curves" loading="lazy" />
+        </div>
+        <div class="panel plot-card">
+          <div class="panel-title">Custom CNN (0.50 Default vs 0.176 Tuned)</div>
+          <div class="cm-pair">
+            <img src="assets/plots/confusion_cnn_default.png" alt="CNN Confusion Matrix 0.50" loading="lazy" />
+            <img src="assets/plots/confusion_cnn_tuned.png" alt="CNN Confusion Matrix 0.176" loading="lazy" />
+          </div>
+        </div>
+        <div class="panel plot-card">
+          <div class="panel-title">MobileNetV2 (0.50 Default vs 0.281 Tuned)</div>
+          <div class="cm-pair">
+            <img src="assets/plots/confusion_mobilenet_default.png" alt="MobileNet Confusion Matrix 0.50" loading="lazy" />
+            <img src="assets/plots/confusion_mobilenet_tuned.png" alt="MobileNet Confusion Matrix 0.281" loading="lazy" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 5: ARCHITECTURE, GRAD-CAM & LIMITATIONS -->
+    <section id="architecture" class="section-block">
+      <div class="section-header">
+        <div>
+          <span class="section-eyebrow">Technical Report Summary • Full Analysis in malaria_cnn.ipynb</span>
+          <h2>5. Architecture, Explainability &amp; Clinical Limitations</h2>
+        </div>
+      </div>
+
+      <div class="report-grid">
+        <div class="panel report-card">
+          <h3>Custom CNN Architecture (0.25M Params)</h3>
+          <p>Designed specifically for 128&times;128 segmented red blood cell patches:</p>
+          <pre class="arch-code">Input: 3 &times; 128 &times; 128 RGB scaled to [0, 1]
+  &darr;
+Block 1: Conv2d(3&rarr;32, 3&times;3) &rarr; BatchNorm &rarr; ReLU &rarr; MaxPool(2&times;2)   [64&times;64]
+  &darr;
+Block 2: Conv2d(32&rarr;64, 3&times;3) &rarr; BatchNorm &rarr; ReLU &rarr; MaxPool(2&times;2)  [32&times;32]
+  &darr;
+Block 3: Conv2d(64&rarr;128, 3&times;3) &rarr; BatchNorm &rarr; ReLU &rarr; MaxPool(2&times;2) [16&times;16]
+  &darr;
+Block 4: Conv2d(128&rarr;128, 3&times;3) &rarr; BatchNorm &rarr; ReLU &rarr; MaxPool(2&times;2) [8&times;8]
+  &darr;
+Head: AdaptiveAvgPool2d(1) &rarr; Dropout(0.5) &rarr; Linear(128&rarr;64) &rarr; ReLU &rarr; Linear(64&rarr;1)</pre>
+          <ul class="report-list">
+            <li><strong>Mixed Precision:</strong> Trained with FP16 <code>torch.autocast</code> + <code>BCEWithLogitsLoss</code> and Adam (<code>lr=1e-3</code>).</li>
+            <li><strong>Data Augmentation:</strong> Random horizontal/vertical flips, full 360&deg; rotation, &plusmn;10% zoom, and &plusmn;10% brightness jitter on the training split only.</li>
+          </ul>
+        </div>
+
+        <div class="panel report-card">
+          <h3>Grad-CAM Findings &amp; Clinical Limitations</h3>
+          <ul class="report-list">
+            <li><strong>Sharp Parasite Localization:</strong> On true positives, the Custom CNN's Block-4 (16&times;16) Grad-CAM heatmap forms a tight focal hot-spot directly over the dark-purple Giemsa-stained chromatin dot/ring inside the cell, ignoring the black background.</li>
+            <li><strong>False Alarm Mechanism:</strong> False positives typically occur when segmentation artifacts or extracellular purple debris lie along the cell membrane border.</li>
+            <li><strong>Dataset Label Noise:</strong> Inspection of the highest-confidence "errors" reveals several cells labeled <em>Uninfected</em> in the NIH dataset that visibly contain stained rings, and vice versa.</li>
+            <li><strong>No Patient-Level Split:</strong> The Kaggle NIH release lacks patient/slide IDs, meaning cells from the same patient smear can appear across splits. External clinical deployment requires slide-level cross-validation.</li>
+            <li><strong>Screening Aid Only:</strong> Even at the recall-tuned threshold (97.44% sensitivity), ~2.5% of infected cells are missed; positive or borderline slides must be confirmed by a microscopist.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div>
+        <strong>Malaria Cell Image Classification (PyTorch CNN)</strong> • Built &amp; Trained on NVIDIA RTX 5050 Laptop GPU
+      </div>
+      <div>
+        <a href="https://github.com/pjindal6be25-gif/malaria-cell-classification" target="_blank" rel="noopener">View Source &amp; Notebook on GitHub &rarr;</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
